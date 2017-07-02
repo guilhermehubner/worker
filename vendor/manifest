@@ -1,0 +1,22 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/streadway/amqp",
+			"repository": "https://github.com/streadway/amqp",
+			"vcs": "git",
+			"revision": "27859d32540aebd2e5befa52dc59ae8e6a0132b6",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/net/context",
+			"repository": "https://go.googlesource.com/net",
+			"vcs": "git",
+			"revision": "1f9224279e98554b6a6432d4dd998a739f8b2b7c",
+			"branch": "master",
+			"path": "/context",
+			"notests": true
+		}
+	]
+}
