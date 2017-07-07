@@ -6,7 +6,6 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// Enqueuer can enqueue jobs.
 type Enqueuer struct {
 	channel *amqp.Channel
 }

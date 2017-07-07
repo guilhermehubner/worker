@@ -1,22 +1,20 @@
 package worker
 
 import (
-	"github.com/streadway/amqp"
 	"golang.org/x/net/context"
+
+	"github.com/streadway/amqp"
 )
 
-type getJobHandle func() (*amqp.Delivery, jobHandle)
+type getJobHandle func() (*amqp.Delivery, *JobType)
 
 type worker struct {
-	ctx    context.Context
 	getJob getJobHandle
 	cancel chan bool
 }
 
-func newWorker(ctx context.Context, getJob getJobHandle,
-	cancel chan bool) *worker {
+func newWorker(getJob getJobHandle, cancel chan bool) *worker {
 	return &worker{
-		ctx:    ctx,
 		getJob: getJob,
 		cancel: cancel,
 	}
@@ -36,13 +34,24 @@ func (w *worker) start() {
 }
 
 func (w *worker) executeJob() {
-	message, handle := w.getJob()
-	if message == nil || handle == nil {
+	message, job := w.getJob()
+	if message == nil || job == nil {
 		return
 	}
 
-	err := handle(w.ctx, message.Body)
-	if err == nil {
-		message.Ack(false)
+	retries := 1
+	if job.Retry > 0 {
+		retries = int(job.Retry)
+	}
+
+	for i := retries; i > 0; i-- {
+		ctx, cancelFn := context.WithCancel(context.Background())
+
+		err := job.Handle(ctx, message.Body)
+		if err == nil {
+			break
+		}
+
+		cancelFn()
 	}
 }
