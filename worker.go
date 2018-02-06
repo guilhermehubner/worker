@@ -9,14 +9,16 @@ import (
 type getJobHandle func() (*amqp.Delivery, *JobType)
 
 type worker struct {
-	getJob getJobHandle
-	cancel chan bool
+	middlewares []Middleware
+	getJob      getJobHandle
+	cancel      chan bool
 }
 
-func newWorker(getJob getJobHandle, cancel chan bool) *worker {
+func newWorker(middlewares []Middleware, getJob getJobHandle, cancel chan bool) *worker {
 	return &worker{
-		getJob: getJob,
-		cancel: cancel,
+		middlewares: middlewares,
+		getJob:      getJob,
+		cancel:      cancel,
 	}
 }
 
@@ -44,10 +46,23 @@ func (w *worker) executeJob() {
 		retries = int(job.Retry)
 	}
 
+	wrappedHandle := func(ctx context.Context) error {
+		return job.Handle(ctx, message.Body)
+	}
+
+	for i := len(w.middlewares) - 1; i >= 0; i-- {
+		index := i
+		oldWrapped := wrappedHandle
+
+		wrappedHandle = func(ctx context.Context) error {
+			return w.middlewares[index](ctx, oldWrapped)
+		}
+	}
+
 	for i := retries; i > 0; i-- {
 		ctx, cancelFn := context.WithCancel(context.Background())
 
-		err := job.Handle(ctx, message.Body)
+		err := wrappedHandle(ctx)
 		if err == nil {
 			break
 		}
