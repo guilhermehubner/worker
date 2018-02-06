@@ -2,7 +2,7 @@ package worker
 
 import "golang.org/x/net/context"
 
-type JobHandle func(context.Context, []byte) error
+type JobHandle func(context.Context, ...interface{}) error
 
 // JobType settings of job which should be passed to RegisterJob
 type JobType struct {

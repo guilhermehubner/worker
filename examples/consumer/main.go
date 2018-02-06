@@ -28,8 +28,10 @@ func main() {
 
 	wp.RegisterJob(worker.JobType{
 		Name: "fila1",
-		Handle: func(_ context.Context, msg []byte) error {
-			fmt.Printf("Job: fila 1, msg: %s\n", msg)
+		Handle: func(_ context.Context, params ...interface{}) error {
+			for position, value := range params {
+				fmt.Printf("Job: fila 1, param %d, msg: %s\n", position, value)
+			}
 			return nil
 		},
 		Priority: 10,
@@ -37,8 +39,10 @@ func main() {
 
 	wp.RegisterJob(worker.JobType{
 		Name: "fila2",
-		Handle: func(_ context.Context, msg []byte) error {
-			fmt.Printf("Job: fila 2, msg: %s\n", msg)
+		Handle: func(_ context.Context, params ...interface{}) error {
+			for position, value := range params {
+				fmt.Printf("Job: fila 2, param %d, msg: %s\n", position, value)
+			}
 			return nil
 		},
 		Priority: 15,
