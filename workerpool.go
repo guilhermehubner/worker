@@ -1,17 +1,22 @@
 package worker
 
 import (
+	"fmt"
+	"os"
+	"os/signal"
 	"sort"
+	"syscall"
 
 	"github.com/streadway/amqp"
 	"golang.org/x/net/context"
 )
 
+var gracefulStop = make(chan os.Signal)
+
 type WorkerPool struct {
 	channel     *amqp.Channel
 	workers     []*worker
 	jobTypes    jobTypes
-	cancel      chan bool
 	middlewares []Middleware
 }
 
@@ -19,12 +24,23 @@ type Middleware func(context.Context, func(context.Context) error) error
 
 // Start starts the workers and associated processes.
 func (wp *WorkerPool) Start() {
+	signal.Notify(gracefulStop, syscall.SIGTERM)
+	signal.Notify(gracefulStop, syscall.SIGINT)
+	go func() {
+		<-gracefulStop
+		for _, w := range wp.workers {
+			if w != nil {
+				w.cancel <- struct{}{}
+			}
+		}
+	}()
+
 	sort.Sort(wp.jobTypes)
 
 	getJob := func() (*amqp.Delivery, *JobType) {
 		for _, jobType := range wp.jobTypes {
-			msg, ok, _ := wp.channel.Get(jobType.Name, true)
-			if !ok {
+			msg, ok, err := wp.channel.Get(jobType.Name, true)
+			if !ok || err != nil {
 				continue
 			}
 
@@ -34,12 +50,17 @@ func (wp *WorkerPool) Start() {
 		return nil, nil
 	}
 
-	for _, w := range wp.workers {
-		w = newWorker(wp.middlewares, getJob, wp.cancel)
-		w.start()
+	workersEnded := make([]chan struct{}, 0, len(wp.workers))
+
+	for i, _ := range wp.workers {
+		wp.workers[i] = newWorker(wp.middlewares, getJob)
+		workersEnded = append(workersEnded, wp.workers[i].start())
 	}
 
-	<-wp.cancel
+	for i, w := range wp.workers {
+		<-w.ended
+		fmt.Printf("Finish worker %d\n", i+1)
+	}
 }
 
 // RegisterJob adds a job with handler for 'name' queue and allows you to specify options such as a job's priority and it's retry count.

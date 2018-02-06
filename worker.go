@@ -11,28 +11,33 @@ type getJobHandle func() (*amqp.Delivery, *JobType)
 type worker struct {
 	middlewares []Middleware
 	getJob      getJobHandle
-	cancel      chan bool
+	cancel      chan struct{}
+	ended       chan struct{}
 }
 
-func newWorker(middlewares []Middleware, getJob getJobHandle, cancel chan bool) *worker {
+func newWorker(middlewares []Middleware, getJob getJobHandle) *worker {
 	return &worker{
 		middlewares: middlewares,
 		getJob:      getJob,
-		cancel:      cancel,
+		cancel:      make(chan struct{}),
+		ended:       make(chan struct{}),
 	}
 }
 
-func (w *worker) start() {
+func (w *worker) start() chan struct{} {
 	go func() {
 		for {
 			select {
 			case <-w.cancel:
+				w.ended <- struct{}{}
 				return
 			default:
 				w.executeJob()
 			}
 		}
 	}()
+
+	return w.ended
 }
 
 func (w *worker) executeJob() {
