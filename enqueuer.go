@@ -22,7 +22,7 @@ func NewEnqueuer(channel *amqp.Channel) *Enqueuer {
 }
 
 // Enqueue will enqueue the specified job name and arguments. The args param can be nil if no args ar needed.
-func (e *Enqueuer) Enqueue(jobName string, message []byte) error {
+func (e *Enqueuer) Enqueue(jobName string, params ...interface{}) error {
 	queue, err := e.channel.QueueDeclare(
 		jobName, // name
 		true,    // durable
@@ -36,6 +36,11 @@ func (e *Enqueuer) Enqueue(jobName string, message []byte) error {
 		return err
 	}
 
+	body, err := encode(params)
+	if err != nil {
+		return err
+	}
+
 	err = e.channel.Publish(
 		"",
 		queue.Name,
@@ -44,7 +49,7 @@ func (e *Enqueuer) Enqueue(jobName string, message []byte) error {
 		amqp.Publishing{
 			MessageId: makeIdentifier(),
 			Timestamp: time.Now(),
-			Body:      message,
+			Body:      body,
 		},
 	)
 

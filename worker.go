@@ -65,7 +65,11 @@ func (w *worker) executeJob() {
 	}
 
 	wrappedHandle := func(ctx context.Context) error {
-		return job.Handle(ctx, message.Body)
+		var params []interface{}
+		if err := decode(message.Body, &params); err != nil {
+			return err
+		}
+		return job.Handle(ctx, params...)
 	}
 
 	for i := len(w.middlewares) - 1; i >= 0; i-- {
