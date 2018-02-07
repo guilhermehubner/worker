@@ -18,16 +18,17 @@ type WorkerPool struct {
 	workers     []*worker
 	jobTypes    jobTypes
 	middlewares []Middleware
+	stop        bool
 }
 
 type Middleware func(context.Context, func(context.Context) error) error
 
 // Start starts the workers and associated processes.
 func (wp *WorkerPool) Start() {
-	signal.Notify(gracefulStop, syscall.SIGTERM)
-	signal.Notify(gracefulStop, syscall.SIGINT)
+	signal.Notify(gracefulStop, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		<-gracefulStop
+		wp.stop = true
 		for _, w := range wp.workers {
 			if w != nil {
 				w.cancel <- struct{}{}
@@ -39,6 +40,10 @@ func (wp *WorkerPool) Start() {
 
 	getJob := func() (*amqp.Delivery, *JobType) {
 		for _, jobType := range wp.jobTypes {
+			if wp.stop {
+				return nil, nil
+			}
+
 			msg, ok, err := wp.channel.Get(jobType.Name, true)
 			if !ok || err != nil {
 				continue
