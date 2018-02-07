@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/guilhermehubner/worker"
+	"github.com/guilhermehubner/worker/examples/payload"
 	"github.com/streadway/amqp"
 )
 
@@ -26,12 +27,19 @@ func main() {
 	for {
 		time.Sleep(500 * time.Millisecond)
 
-		err = worker.NewEnqueuer(ch).Enqueue("fila1", []byte(fmt.Sprintf("%s: Olá fila 1", time.Now().String())))
+		err = worker.NewEnqueuer(ch).Enqueue("queue1", &payload.Payload{
+			Text:   "Hello queue 1",
+			Number: time.Now().Unix(),
+		})
 		if err != nil {
 			fmt.Printf("Failed to enqueue 1: %s", err)
 			return
 		}
-		err = worker.NewEnqueuer(ch).Enqueue("fila2", []byte(fmt.Sprintf("%s: Olá fila 2", time.Now().String())))
+
+		err = worker.NewEnqueuer(ch).Enqueue("queue2", &payload.Payload{
+			Text:   "Hello queue 2",
+			Number: time.Now().Unix(),
+		})
 		if err != nil {
 			fmt.Printf("Failed to enqueue 2: %s", err)
 			return

@@ -2,6 +2,24 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/golang/protobuf/proto",
+			"repository": "https://github.com/golang/protobuf",
+			"vcs": "git",
+			"revision": "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175",
+			"branch": "master",
+			"path": "/proto",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/golang/protobuf/ptypes/any",
+			"repository": "https://github.com/golang/protobuf",
+			"vcs": "git",
+			"revision": "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175",
+			"branch": "master",
+			"path": "ptypes/any",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/jpillora/backoff",
 			"repository": "https://github.com/jpillora/backoff",
 			"vcs": "git",

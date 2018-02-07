@@ -5,6 +5,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/jpillora/backoff"
 	"github.com/streadway/amqp"
 )
@@ -54,9 +55,13 @@ func (w *worker) start() chan struct{} {
 }
 
 func (w *worker) executeJob() {
-	message, job := w.getJob()
-	if message == nil || job == nil {
+	rawMessage, job := w.getJob()
+	if rawMessage == nil || job == nil {
 		return
+	}
+
+	gen := func(message proto.Message) error {
+		return proto.Unmarshal(rawMessage.Body, message)
 	}
 
 	retries := 1
@@ -65,7 +70,7 @@ func (w *worker) executeJob() {
 	}
 
 	wrappedHandle := func(ctx context.Context) error {
-		return job.Handle(ctx, message.Body)
+		return job.Handle(ctx, gen)
 	}
 
 	for i := len(w.middlewares) - 1; i >= 0; i-- {

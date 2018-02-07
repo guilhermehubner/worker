@@ -1,8 +1,11 @@
 package worker
 
-import "golang.org/x/net/context"
+import (
+	"github.com/golang/protobuf/proto"
+	"golang.org/x/net/context"
+)
 
-type JobHandle func(context.Context, []byte) error
+type JobHandle func(context.Context, func(proto.Message) error) error
 
 // JobType settings of job which should be passed to RegisterJob
 type JobType struct {

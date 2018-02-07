@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 
-	"golang.org/x/net/context"
+	"context"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/guilhermehubner/worker"
+	"github.com/guilhermehubner/worker/examples/payload"
 	"github.com/streadway/amqp"
 )
 
@@ -24,21 +26,43 @@ func main() {
 	}
 	defer ch.Close()
 
-	wp := worker.NewWorkerPool(5, ch)
+	wp := worker.NewWorkerPool(5, ch,
+		func(ctx context.Context, next func(context.Context) error) error {
+			fmt.Print("Enter on Middleware 1 > ")
+			return next(ctx)
+		},
+		func(ctx context.Context, next func(context.Context) error) error {
+			fmt.Print("Enter on Middleware 2 > ")
+			return next(ctx)
+		})
 
 	wp.RegisterJob(worker.JobType{
-		Name: "fila1",
-		Handle: func(_ context.Context, msg []byte) error {
-			fmt.Printf("Job: fila 1, msg: %s\n", msg)
+		Name: "queue1",
+		Handle: func(_ context.Context, gen func(proto.Message) error) error {
+			msg := payload.Payload{}
+			err := gen(&msg)
+			if err != nil {
+				fmt.Println("Fail to decode message on queue 1")
+				return nil
+			}
+
+			fmt.Printf("Job: queue 1, msg: %s gen-> %d\n", msg.Text, msg.Number)
 			return nil
 		},
 		Priority: 10,
 	})
 
 	wp.RegisterJob(worker.JobType{
-		Name: "fila2",
-		Handle: func(_ context.Context, msg []byte) error {
-			fmt.Printf("Job: fila 2, msg: %s\n", msg)
+		Name: "queue2",
+		Handle: func(_ context.Context, gen func(proto.Message) error) error {
+			msg := payload.Payload{}
+			err := gen(&msg)
+			if err != nil {
+				fmt.Println("Fail to decode message on queue 2")
+				return nil
+			}
+
+			fmt.Printf("Job: queue 2, msg: %s gen-> %d\n", msg.Text, msg.Number)
 			return nil
 		},
 		Priority: 15,
