@@ -1,17 +1,9 @@
 package worker
 
 import (
-	"time"
-
 	"golang.org/x/net/context"
 
-	"github.com/jpillora/backoff"
 	"github.com/streadway/amqp"
-)
-
-const (
-	minBackoffTime = 100 * time.Millisecond
-	maxBackoffTime = 10 * time.Second
 )
 
 type getJobHandle func() (*amqp.Delivery, *JobType)
@@ -21,7 +13,6 @@ type worker struct {
 	getJob      getJobHandle
 	cancel      chan struct{}
 	ended       chan struct{}
-	backoff     *backoff.Backoff
 }
 
 func newWorker(middlewares []Middleware, getJob getJobHandle) *worker {
@@ -30,10 +21,6 @@ func newWorker(middlewares []Middleware, getJob getJobHandle) *worker {
 		getJob:      getJob,
 		cancel:      make(chan struct{}),
 		ended:       make(chan struct{}),
-		backoff: &backoff.Backoff{
-			Min: minBackoffTime,
-			Max: maxBackoffTime,
-		},
 	}
 }
 
@@ -82,11 +69,9 @@ func (w *worker) executeJob() {
 
 		err := wrappedHandle(ctx)
 		if err == nil {
-			w.backoff.Reset()
 			break
 		}
 
 		cancelFn()
-		time.Sleep(w.backoff.Duration())
 	}
 }
