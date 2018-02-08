@@ -5,6 +5,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+type jobInfoKey struct{}
+
 type JobHandle func(context.Context, func(proto.Message) error) error
 
 // JobType settings of job which should be passed to RegisterJob
@@ -13,6 +15,12 @@ type JobType struct {
 	Handle   JobHandle // The job handler function
 	Priority uint      // Priority from 1 to 10000
 	Retry    uint8     // Retry count 1 to 255
+}
+
+type JobInfo struct {
+	Name     string
+	Priority uint
+	Retry    uint8
 }
 
 type jobTypes []JobType
@@ -27,4 +35,18 @@ func (slice jobTypes) Less(i, j int) bool {
 
 func (slice jobTypes) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
+}
+
+func injectJobInfo(ctx context.Context, job JobType) context.Context {
+	ctx = context.WithValue(ctx, jobInfoKey{}, JobInfo{
+		Name:     job.Name,
+		Priority: job.Priority,
+		Retry:    job.Retry,
+	})
+
+	return ctx
+}
+
+func JobInfoFromContext(ctx context.Context) JobInfo {
+	return ctx.Value(jobInfoKey{}).(JobInfo)
 }

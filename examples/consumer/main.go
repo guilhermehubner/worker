@@ -38,7 +38,7 @@ func main() {
 
 	wp.RegisterJob(worker.JobType{
 		Name: "queue1",
-		Handle: func(_ context.Context, gen func(proto.Message) error) error {
+		Handle: func(ctx context.Context, gen func(proto.Message) error) error {
 			msg := payload.Payload{}
 			err := gen(&msg)
 			if err != nil {
@@ -46,7 +46,8 @@ func main() {
 				return nil
 			}
 
-			fmt.Printf("Job: queue 1, msg: %s gen-> %d\n", msg.Text, msg.Number)
+			fmt.Printf("Job: queue 1, msg: %s gen-> %d - job: %s\n", msg.Text, msg.Number,
+				worker.JobInfoFromContext(ctx).Name)
 			return nil
 		},
 		Priority: 10,
@@ -54,7 +55,7 @@ func main() {
 
 	wp.RegisterJob(worker.JobType{
 		Name: "queue2",
-		Handle: func(_ context.Context, gen func(proto.Message) error) error {
+		Handle: func(ctx context.Context, gen func(proto.Message) error) error {
 			msg := payload.Payload{}
 			err := gen(&msg)
 			if err != nil {
@@ -62,7 +63,8 @@ func main() {
 				return nil
 			}
 
-			fmt.Printf("Job: queue 2, msg: %s gen-> %d\n", msg.Text, msg.Number)
+			fmt.Printf("Job: queue 2, msg: %s gen-> %d - job: %s\n", msg.Text, msg.Number,
+				worker.JobInfoFromContext(ctx).Name)
 			return nil
 		},
 		Priority: 15,
