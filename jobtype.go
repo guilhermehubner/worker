@@ -18,9 +18,10 @@ type JobType struct {
 }
 
 type JobInfo struct {
-	Name     string
-	Priority uint
-	Retry    uint8
+	MessageID string
+	Name      string
+	Priority  uint
+	Retry     uint8
 }
 
 type jobTypes []JobType
@@ -37,11 +38,12 @@ func (slice jobTypes) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func injectJobInfo(ctx context.Context, job JobType) context.Context {
+func injectJobInfo(ctx context.Context, job JobType, messageID string) context.Context {
 	ctx = context.WithValue(ctx, jobInfoKey{}, JobInfo{
-		Name:     job.Name,
-		Priority: job.Priority,
-		Retry:    job.Retry,
+		MessageID: messageID,
+		Name:      job.Name,
+		Priority:  job.Priority,
+		Retry:     job.Retry,
 	})
 
 	return ctx

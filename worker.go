@@ -78,7 +78,8 @@ func (w *worker) executeJob() {
 		oldWrapped := wrappedHandle
 
 		wrappedHandle = func(ctx context.Context) error {
-			return w.middlewares[index](injectJobInfo(ctx, *job), oldWrapped)
+			return w.middlewares[index](injectJobInfo(ctx, *job, rawMessage.MessageId),
+				oldWrapped)
 		}
 	}
 
