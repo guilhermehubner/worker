@@ -21,7 +21,30 @@ type WorkerPool struct {
 	stop        bool
 }
 
+type Status struct {
+	JobName  string
+	Messages int64
+}
+
 type Middleware func(context.Context, func(context.Context) error) error
+
+func (wp *WorkerPool) GetPoolStatus() ([]Status, error) {
+	stats := make([]Status, 0, len(wp.jobTypes))
+
+	for _, jobType := range wp.jobTypes {
+		q, err := wp.channel.QueueInspect(jobType.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		stats = append(stats, Status{
+			JobName:  jobType.Name,
+			Messages: int64(q.Messages),
+		})
+	}
+
+	return stats, nil
+}
 
 // Start starts the workers and associated processes.
 func (wp *WorkerPool) Start() {
@@ -70,6 +93,18 @@ func (wp *WorkerPool) Start() {
 
 // RegisterJob adds a job with handler for 'name' queue and allows you to specify options such as a job's priority and it's retry count.
 func (wp *WorkerPool) RegisterJob(job JobType) {
+	_, err := wp.channel.QueueDeclare(
+		job.Name, // name
+		true,     // durable
+		false,    // delete when unused
+		false,    // exclusive
+		false,    // no-wait
+		nil,      // arguments
+	)
+	if err != nil {
+		// TODO
+	}
+
 	wp.jobTypes = append(wp.jobTypes, job)
 }
 
