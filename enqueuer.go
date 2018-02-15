@@ -52,9 +52,10 @@ func (e *Enqueuer) Enqueue(jobName string, message proto.Message) error {
 		false,
 		false,
 		amqp.Publishing{
-			MessageId: makeIdentifier(),
-			Timestamp: time.Now(),
-			Body:      body,
+			MessageId:    makeIdentifier(),
+			Timestamp:    time.Now(),
+			Body:         body,
+			DeliveryMode: 2,
 		},
 	)
 
