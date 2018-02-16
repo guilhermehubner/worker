@@ -7,7 +7,9 @@ import (
 
 type jobInfoKey struct{}
 
-type JobHandle func(context.Context, func(proto.Message) error) error
+type GenFunc func(proto.Message) error
+
+type JobHandle func(context.Context, GenFunc) error
 
 // JobType settings of job which should be passed to RegisterJob
 type JobType struct {

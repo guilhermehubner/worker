@@ -5,42 +5,35 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"syscall"
 
-	"github.com/streadway/amqp"
+	"github.com/guilhermehubner/worker/broker"
 	"golang.org/x/net/context"
 )
 
 var gracefulStop = make(chan os.Signal)
 
 type WorkerPool struct {
-	channel     *amqp.Channel
+	broker      *broker.AMQPBroker
 	workers     []*worker
 	jobTypes    jobTypes
 	middlewares []Middleware
 	stop        bool
 }
 
-type Status struct {
-	JobName  string
-	Messages int64
-}
-
 type Middleware func(context.Context, func(context.Context) error) error
 
-func (wp *WorkerPool) GetPoolStatus() ([]Status, error) {
-	stats := make([]Status, 0, len(wp.jobTypes))
+func (wp *WorkerPool) GetPoolStatus() ([]broker.Status, error) {
+	stats := make([]broker.Status, 0, len(wp.jobTypes))
 
 	for _, jobType := range wp.jobTypes {
-		q, err := wp.channel.QueueInspect(jobType.Name)
+		s, err := wp.broker.GetJobStatus(jobType.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		stats = append(stats, Status{
-			JobName:  jobType.Name,
-			Messages: int64(q.Messages),
-		})
+		stats = append(stats, s)
 	}
 
 	return stats, nil
@@ -61,21 +54,21 @@ func (wp *WorkerPool) Start() {
 
 	sort.Sort(wp.jobTypes)
 
-	getJob := func() (*amqp.Delivery, *JobType) {
+	getJob := func() ([]byte, string, *JobType) {
 		for _, jobType := range wp.jobTypes {
 			if wp.stop {
-				return nil, nil
+				return nil, "", nil
 			}
 
-			msg, ok, err := wp.channel.Get(jobType.Name, true)
-			if !ok || err != nil {
+			msg, messageID := wp.broker.GetMessage(jobType.Name)
+			if msg == nil {
 				continue
 			}
 
-			return &msg, &jobType
+			return msg, messageID, &jobType
 		}
 
-		return nil, nil
+		return nil, "", nil
 	}
 
 	workersEnded := make([]chan struct{}, 0, len(wp.workers))
@@ -93,14 +86,7 @@ func (wp *WorkerPool) Start() {
 
 // RegisterJob adds a job with handler for 'name' queue and allows you to specify options such as a job's priority and it's retry count.
 func (wp *WorkerPool) RegisterJob(job JobType) {
-	_, err := wp.channel.QueueDeclare(
-		job.Name, // name
-		true,     // durable
-		false,    // delete when unused
-		false,    // exclusive
-		false,    // no-wait
-		nil,      // arguments
-	)
+	err := wp.broker.RegisterJob(job.Name)
 	if err != nil {
 		// TODO
 	}
@@ -108,16 +94,21 @@ func (wp *WorkerPool) RegisterJob(job JobType) {
 	wp.jobTypes = append(wp.jobTypes, job)
 }
 
-// NewWorkerPool creates a new worker pool. ctx will be used for middleware and handlers. concurrency specifies how many workers to spin up - each worker can process jobs concurrently.
-func NewWorkerPool(concurrency uint, channel *amqp.Channel,
-	middlewares ...Middleware) *WorkerPool {
-	if channel == nil {
-		panic("worker equeuer: needs a non-nil *amqp.Channel")
+/*
+NewWorkerPool creates a new worker pool.
+
+URL is a string connection in the AMQP URI format.
+
+Concurrency specifies how many workers to spin up - each worker can process jobs concurrently.
+*/
+func NewWorkerPool(url string, concurrency uint, middlewares ...Middleware) *WorkerPool {
+	if strings.TrimSpace(url) == "" {
+		panic("worker workerpool: needs a non-empty url")
 	}
 
 	wp := &WorkerPool{
+		broker:      broker.NewBroker(url),
 		middlewares: middlewares,
-		channel:     channel,
 		workers:     make([]*worker, concurrency),
 	}
 

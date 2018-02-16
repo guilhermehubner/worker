@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jpillora/backoff"
-	"github.com/streadway/amqp"
 )
 
 const (
@@ -15,7 +14,7 @@ const (
 	maxBackoffTime = 10 * time.Second
 )
 
-type getJobHandle func() (*amqp.Delivery, *JobType)
+type getJobHandle func() ([]byte, string, *JobType)
 
 type worker struct {
 	middlewares []Middleware
@@ -55,13 +54,13 @@ func (w *worker) start() chan struct{} {
 }
 
 func (w *worker) executeJob() {
-	rawMessage, job := w.getJob()
+	rawMessage, messageID, job := w.getJob()
 	if rawMessage == nil || job == nil {
 		return
 	}
 
 	gen := func(message proto.Message) error {
-		return proto.Unmarshal(rawMessage.Body, message)
+		return proto.Unmarshal(rawMessage, message)
 	}
 
 	retries := 1
@@ -78,7 +77,7 @@ func (w *worker) executeJob() {
 		oldWrapped := wrappedHandle
 
 		wrappedHandle = func(ctx context.Context) error {
-			return w.middlewares[index](injectJobInfo(ctx, *job, rawMessage.MessageId),
+			return w.middlewares[index](injectJobInfo(ctx, *job, messageID),
 				oldWrapped)
 		}
 	}
