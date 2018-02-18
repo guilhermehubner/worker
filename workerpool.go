@@ -14,7 +14,7 @@ import (
 
 var gracefulStop = make(chan os.Signal)
 
-type WorkerPool struct {
+type Pool struct {
 	broker      *broker.AMQPBroker
 	workers     []*worker
 	jobTypes    jobTypes
@@ -24,7 +24,7 @@ type WorkerPool struct {
 
 type Middleware func(context.Context, func(context.Context) error) error
 
-func (wp *WorkerPool) GetPoolStatus() ([]broker.Status, error) {
+func (wp *Pool) GetPoolStatus() ([]broker.Status, error) {
 	stats := make([]broker.Status, 0, len(wp.jobTypes))
 
 	for _, jobType := range wp.jobTypes {
@@ -40,7 +40,7 @@ func (wp *WorkerPool) GetPoolStatus() ([]broker.Status, error) {
 }
 
 // Start starts the workers and associated processes.
-func (wp *WorkerPool) Start() {
+func (wp *Pool) Start() {
 	signal.Notify(gracefulStop, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		<-gracefulStop
@@ -73,7 +73,7 @@ func (wp *WorkerPool) Start() {
 
 	workersEnded := make([]chan struct{}, 0, len(wp.workers))
 
-	for i, _ := range wp.workers {
+	for i := range wp.workers {
 		wp.workers[i] = newWorker(wp.middlewares, getJob)
 		workersEnded = append(workersEnded, wp.workers[i].start())
 	}
@@ -84,8 +84,11 @@ func (wp *WorkerPool) Start() {
 	}
 }
 
-// RegisterJob adds a job with handler for 'name' queue and allows you to specify options such as a job's priority and it's retry count.
-func (wp *WorkerPool) RegisterJob(job JobType) {
+/*
+RegisterJob adds a job with handler for 'name' queue and allows you to specify options such as a
+job's priority and it's retry count.
+*/
+func (wp *Pool) RegisterJob(job JobType) {
 	err := wp.broker.RegisterJob(job.Name)
 	if err != nil {
 		// TODO
@@ -101,12 +104,12 @@ URL is a string connection in the AMQP URI format.
 
 Concurrency specifies how many workers to spin up - each worker can process jobs concurrently.
 */
-func NewWorkerPool(url string, concurrency uint, middlewares ...Middleware) *WorkerPool {
+func NewWorkerPool(url string, concurrency uint, middlewares ...Middleware) *Pool {
 	if strings.TrimSpace(url) == "" {
 		panic("worker workerpool: needs a non-empty url")
 	}
 
-	wp := &WorkerPool{
+	wp := &Pool{
 		broker:      broker.NewBroker(url),
 		middlewares: middlewares,
 		workers:     make([]*worker, concurrency),

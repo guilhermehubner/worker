@@ -1,0 +1,23 @@
+---
+language: go
+
+go:
+  - 1.9.4
+  - 1.8.7
+
+install:
+  - go get -u github.com/FiloSottile/gvt
+  - go get -u github.com/FiloSottile/vendorcheck
+  - go get -u github.com/golang/lint/golint
+  - go get -u github.com/kisielk/errcheck
+  - go get -u honnef.co/go/tools/cmd/gosimple
+  - go get -u honnef.co/go/tools/cmd/unused
+  - go get -u github.com/walle/lll/...
+
+script:
+  - gvt restore
+  - make lint
+  - vendorcheck ./...
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

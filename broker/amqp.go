@@ -118,10 +118,9 @@ func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) e
 
 	if err != nil {
 		// TODO
-		return err
 	}
 
-	return nil
+	return err
 }
 
 func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
@@ -224,12 +223,9 @@ func (b *AMQPBroker) connect() {
 }
 
 func (b *AMQPBroker) reconnect() {
-	for {
-		select {
-		case <-b.closed:
-			b.connected = false
-			b.connect()
-		}
+	for range b.closed {
+		b.connected = false
+		b.connect()
 	}
 }
 
