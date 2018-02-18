@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/guilhermehubner/worker/broker"
+	"github.com/guilhermehubner/worker/errors"
 	"github.com/guilhermehubner/worker/log"
 	"golang.org/x/net/context"
 )
@@ -89,13 +90,14 @@ func (wp *Pool) Start() {
 RegisterJob adds a job with handler for 'name' queue and allows you to specify options such as a
 job's priority and it's retry count.
 */
-func (wp *Pool) RegisterJob(job JobType) {
+func (wp *Pool) RegisterJob(job JobType) error {
 	err := wp.broker.RegisterJob(job.Name)
 	if err != nil {
-		// TODO
+		return errors.ErrJobRegister.WithValue(err)
 	}
 
 	wp.jobTypes = append(wp.jobTypes, job)
+	return nil
 }
 
 /*
@@ -105,9 +107,9 @@ URL is a string connection in the AMQP URI format.
 
 Concurrency specifies how many workers to spin up - each worker can process jobs concurrently.
 */
-func NewWorkerPool(url string, concurrency uint, middlewares ...Middleware) *Pool {
+func NewWorkerPool(url string, concurrency uint, middlewares ...Middleware) (*Pool, error) {
 	if strings.TrimSpace(url) == "" {
-		panic("worker workerpool: needs a non-empty url")
+		return nil, errors.ErrEmptyURL
 	}
 
 	wp := &Pool{
@@ -116,5 +118,5 @@ func NewWorkerPool(url string, concurrency uint, middlewares ...Middleware) *Poo
 		workers:     make([]*worker, concurrency),
 	}
 
-	return wp
+	return wp, nil
 }

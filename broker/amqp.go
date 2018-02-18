@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/guilhermehubner/worker/errors"
 	"github.com/guilhermehubner/worker/log"
 	"github.com/jpillora/backoff"
 	"github.com/streadway/amqp"
@@ -58,7 +59,7 @@ func (b *AMQPBroker) GetJobStatus(jobName string) (Status, error) {
 func (b *AMQPBroker) GetMessage(jobName string) ([]byte, string) {
 	msg, ok, err := b.channel.Get(jobName, true)
 	if err != nil {
-		log.Get().Error(fmt.Sprintf("broker/amqp: fail to get message: %v", err))
+		log.Get().Error(errors.ErrChannelMessage.WithValue(err))
 		return nil, ""
 	}
 	if !ok {
@@ -78,14 +79,12 @@ func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) e
 		nil,     // arguments
 	)
 	if err != nil {
-		// TODO
-		return err
+		return errors.ErrJobEnqueue.WithValue(err)
 	}
 
 	body, err := proto.Marshal(message)
 	if err != nil {
-		// TODO
-		return err
+		return errors.ErrMessageSerialize.WithValue(err)
 	}
 
 	err = b.channel.Publish(
@@ -102,7 +101,7 @@ func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) e
 	)
 
 	if err != nil {
-		// TODO
+		return errors.ErrMessagePublishing.WithValue(err)
 	}
 
 	return err
@@ -119,8 +118,7 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 		nil,     // arguments
 	)
 	if err != nil {
-		// TODO
-		return "", err
+		return "", errors.ErrJobEnqueue.WithValue(err)
 	}
 
 	queue, err := b.channel.QueueDeclare(
@@ -137,14 +135,12 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 		},
 	)
 	if err != nil {
-		// TODO
-		return "", err
+		return "", errors.ErrJobEnqueue.WithValue(err)
 	}
 
 	body, err := proto.Marshal(message)
 	if err != nil {
-		// TODO
-		return "", err
+		return "", errors.ErrMessageSerialize.WithValue(err)
 	}
 
 	err = b.channel.Publish(
@@ -161,8 +157,7 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 	)
 
 	if err != nil {
-		// TODO
-		return "", err
+		return "", errors.ErrMessagePublishing.WithValue(err)
 	}
 
 	return messageID, nil
@@ -172,21 +167,21 @@ func (b *AMQPBroker) connect() {
 	log.Get().Info("CONNECTING...")
 
 	for {
-		connection, err := amqp.Dial(b.url)
+		var err error
+		b.connection, err = amqp.Dial(b.url)
 		if err != nil {
-			log.Get().Error(fmt.Sprintf("broker/amqp: fail to connect: %v", err))
+			log.Get().Error(errors.ErrConnection.WithValue(err))
 			time.Sleep(b.backoff.Duration())
 			continue
 		}
 
-		channel, err := connection.Channel()
+		b.channel, err = b.connection.Channel()
 		if err != nil {
-			log.Get().Error(fmt.Sprintf("broker/amqp: fail to get connection channel: %v", err))
+			log.Get().Error(errors.ErrChannelUnavailable.WithValue(err))
+			time.Sleep(b.backoff.Duration())
 			continue
 		}
 
-		b.connection = connection
-		b.channel = channel
 		b.closed = b.connection.NotifyClose(make(chan *amqp.Error))
 		b.backoff.Reset()
 		b.connected = true
