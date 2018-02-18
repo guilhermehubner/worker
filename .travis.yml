@@ -6,7 +6,7 @@ go:
   - 1.8.7
 
 install:
-  - go get -u github.com/FiloSottile/gvt
+  - go get -u github.com/golang/dep/cmd/dep
   - go get -u github.com/FiloSottile/vendorcheck
   - go get -u github.com/golang/lint/golint
   - go get -u github.com/kisielk/errcheck
@@ -15,7 +15,7 @@ install:
   - go get -u github.com/walle/lll/...
 
 script:
-  - gvt restore
+  - dep ensure
   - make lint
   - vendorcheck ./...
 
