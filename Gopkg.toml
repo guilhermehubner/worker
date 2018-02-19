@@ -1,0 +1,13 @@
+[[constraint]]
+  branch = "master"
+  name = "github.com/golang/protobuf"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/jpillora/backoff"
+
+[[constraint]]
+  name = "github.com/streadway/amqp"
+
+[[constraint]]
+  name = "golang.org/x/net"
