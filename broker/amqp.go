@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/guilhermehubner/worker/log"
 	"github.com/jpillora/backoff"
 	"github.com/streadway/amqp"
 )
@@ -70,7 +71,11 @@ func (b *AMQPBroker) GetMessage(jobName string) ([]byte, string) {
 	}
 
 	msg, ok, err := channel.Get(jobName, true)
-	if !ok || err != nil {
+	if err != nil {
+		log.Get().Error(fmt.Sprintf("broker/amqp: fail to get message: %v", err))
+		return nil, ""
+	}
+	if !ok {
 		return nil, ""
 	}
 
@@ -196,6 +201,7 @@ func (b *AMQPBroker) getChannel() (*amqp.Channel, error) {
 	for i := 0; i < 20; i++ {
 		channel, err = b.connection.Channel()
 		if err != nil {
+			log.Get().Error(fmt.Sprintf("broker/amqp: fail to get channel: %v", err))
 			time.Sleep(5 * time.Millisecond)
 			continue
 		}
@@ -207,9 +213,12 @@ func (b *AMQPBroker) getChannel() (*amqp.Channel, error) {
 }
 
 func (b *AMQPBroker) connect() {
+	log.Get().Info("CONNECTING...")
+
 	for {
 		connection, err := amqp.Dial(b.url)
 		if err != nil {
+			log.Get().Error(fmt.Sprintf("broker/amqp: fail to connect: %v", err))
 			time.Sleep(b.backoff.Duration())
 			continue
 		}
@@ -218,12 +227,16 @@ func (b *AMQPBroker) connect() {
 		b.closed = b.connection.NotifyClose(make(chan *amqp.Error))
 		b.backoff.Reset()
 		b.connected = true
+		log.Get().Info("\x1b[1;32mCONNECTED\x1b[0m")
 		break
 	}
 }
 
 func (b *AMQPBroker) reconnect() {
-	for range b.closed {
+	for e := range b.closed {
+		log.Get().Info("\x1b[1;31mCONNECTION CLOSED\x1b[0m")
+		log.Get().Error(e)
+
 		b.connected = false
 		b.connect()
 	}

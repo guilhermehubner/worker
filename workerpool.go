@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/guilhermehubner/worker/broker"
+	"github.com/guilhermehubner/worker/log"
 	"golang.org/x/net/context"
 )
 
@@ -80,7 +81,7 @@ func (wp *Pool) Start() {
 
 	for i, w := range wp.workers {
 		<-w.ended
-		fmt.Printf("Finish worker %d\n", i+1)
+		log.Get().Info(fmt.Sprintf("Finish worker %d", i+1))
 	}
 }
 
