@@ -23,6 +23,7 @@ type AMQPBroker struct {
 	closed     chan *amqp.Error
 	backoff    *backoff.Backoff
 	connected  bool
+	channel    *amqp.Channel
 }
 
 type Status struct {
@@ -32,12 +33,7 @@ type Status struct {
 }
 
 func (b *AMQPBroker) RegisterJob(jobName string) error {
-	channel, err := b.getChannel()
-	if err != nil {
-		return err
-	}
-
-	_, err = channel.QueueDeclare(
+	_, err := b.channel.QueueDeclare(
 		jobName, // name
 		true,    // durable
 		false,   // delete when unused
@@ -50,12 +46,7 @@ func (b *AMQPBroker) RegisterJob(jobName string) error {
 }
 
 func (b *AMQPBroker) GetJobStatus(jobName string) (Status, error) {
-	channel, err := b.getChannel()
-	if err != nil {
-		return Status{}, err
-	}
-
-	q, err := channel.QueueInspect(jobName)
+	q, err := b.channel.QueueInspect(jobName)
 
 	return Status{
 		JobName:  jobName,
@@ -65,12 +56,7 @@ func (b *AMQPBroker) GetJobStatus(jobName string) (Status, error) {
 }
 
 func (b *AMQPBroker) GetMessage(jobName string) ([]byte, string) {
-	channel, err := b.getChannel()
-	if err != nil {
-		return nil, ""
-	}
-
-	msg, ok, err := channel.Get(jobName, true)
+	msg, ok, err := b.channel.Get(jobName, true)
 	if err != nil {
 		log.Get().Error(fmt.Sprintf("broker/amqp: fail to get message: %v", err))
 		return nil, ""
@@ -83,13 +69,7 @@ func (b *AMQPBroker) GetMessage(jobName string) ([]byte, string) {
 }
 
 func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) error {
-	channel, err := b.getChannel()
-	if err != nil {
-		// TODO
-		return err
-	}
-
-	queue, err := channel.QueueDeclare(
+	queue, err := b.channel.QueueDeclare(
 		jobName, // name
 		true,    // durable
 		false,   // delete when unused
@@ -108,7 +88,7 @@ func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) e
 		return err
 	}
 
-	err = channel.Publish(
+	err = b.channel.Publish(
 		"",
 		queue.Name,
 		false,
@@ -130,13 +110,7 @@ func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) e
 
 func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 	secondsFromNow int64) (string, error) {
-	channel, err := b.getChannel()
-	if err != nil {
-		// TODO
-		return "", err
-	}
-
-	_, err = channel.QueueDeclare(
+	_, err := b.channel.QueueDeclare(
 		jobName, // name
 		true,    // durable
 		false,   // delete when unused
@@ -149,7 +123,7 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 		return "", err
 	}
 
-	queue, err := channel.QueueDeclare(
+	queue, err := b.channel.QueueDeclare(
 		fmt.Sprintf(NoConsumerQueue, jobName), // name
 		true,  // durable
 		false, // delete when unused
@@ -173,7 +147,7 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 		return "", err
 	}
 
-	err = channel.Publish(
+	err = b.channel.Publish(
 		"",
 		queue.Name,
 		false,
@@ -194,24 +168,6 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 	return messageID, nil
 }
 
-func (b *AMQPBroker) getChannel() (*amqp.Channel, error) {
-	var channel *amqp.Channel
-	var err error
-
-	for i := 0; i < 20; i++ {
-		channel, err = b.connection.Channel()
-		if err != nil {
-			log.Get().Error(fmt.Sprintf("broker/amqp: fail to get channel: %v", err))
-			time.Sleep(5 * time.Millisecond)
-			continue
-		}
-
-		return channel, nil
-	}
-
-	return channel, err
-}
-
 func (b *AMQPBroker) connect() {
 	log.Get().Info("CONNECTING...")
 
@@ -223,7 +179,14 @@ func (b *AMQPBroker) connect() {
 			continue
 		}
 
+		channel, err := connection.Channel()
+		if err != nil {
+			log.Get().Error(fmt.Sprintf("broker/amqp: fail to get connection channel: %v", err))
+			continue
+		}
+
 		b.connection = connection
+		b.channel = channel
 		b.closed = b.connection.NotifyClose(make(chan *amqp.Error))
 		b.backoff.Reset()
 		b.connected = true
