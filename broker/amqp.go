@@ -45,11 +45,11 @@ func (b *AMQPBroker) RegisterJob(jobName string) error {
 	return err
 }
 
-func (b *AMQPBroker) GetJobStatus(jobName string) (Status, error) {
-	q, err := b.channel.QueueInspect(jobName)
+func (b *AMQPBroker) GetQueueStatus(name string) (Status, error) {
+	q, err := b.channel.QueueInspect(name)
 
 	return Status{
-		JobName:  jobName,
+		JobName:  q.Name,
 		Messages: int64(q.Messages),
 		Error:    err,
 	}, nil
@@ -68,14 +68,14 @@ func (b *AMQPBroker) GetMessage(jobName string) ([]byte, string) {
 	return msg.Body, msg.MessageId
 }
 
-func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) error {
+func (b *AMQPBroker) Enqueue(name, messageID string, message proto.Message) error {
 	queue, err := b.channel.QueueDeclare(
-		jobName, // name
-		true,    // durable
-		false,   // delete when unused
-		false,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
+		name,  // queue name
+		true,  // durable
+		false, // delete when unused
+		false, // exclusive
+		false, // no-wait
+		nil,   // arguments
 	)
 	if err != nil {
 		// TODO
@@ -108,15 +108,15 @@ func (b *AMQPBroker) Enqueue(jobName, messageID string, message proto.Message) e
 	return err
 }
 
-func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
+func (b *AMQPBroker) EnqueueIn(name, messageID string, message proto.Message,
 	secondsFromNow int64) (string, error) {
 	_, err := b.channel.QueueDeclare(
-		jobName, // name
-		true,    // durable
-		false,   // delete when unused
-		false,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
+		name,  // queue name
+		true,  // durable
+		false, // delete when unused
+		false, // exclusive
+		false, // no-wait
+		nil,   // arguments
 	)
 	if err != nil {
 		// TODO
@@ -124,7 +124,7 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 	}
 
 	queue, err := b.channel.QueueDeclare(
-		fmt.Sprintf(NoConsumerQueue, jobName), // name
+		fmt.Sprintf(NoConsumerQueue, name), // name
 		true,  // durable
 		false, // delete when unused
 		false, // exclusive
@@ -133,7 +133,7 @@ func (b *AMQPBroker) EnqueueIn(jobName, messageID string, message proto.Message,
 			// Exchange where to send messages after TTL expiration.
 			"x-dead-letter-exchange": "",
 			// Routing key which use when resending expired messages.
-			"x-dead-letter-routing-key": jobName,
+			"x-dead-letter-routing-key": name,
 		},
 	)
 	if err != nil {

@@ -23,13 +23,15 @@ type Pool struct {
 	stop        bool
 }
 
-type Middleware func(context.Context, func(context.Context) error) error
+type Middleware func(context.Context, NextMiddleware) error
+
+type NextMiddleware func(context.Context) error
 
 func (wp *Pool) GetPoolStatus() ([]broker.Status, error) {
 	stats := make([]broker.Status, 0, len(wp.jobTypes))
 
 	for _, jobType := range wp.jobTypes {
-		s, err := wp.broker.GetJobStatus(jobType.Name)
+		s, err := wp.broker.GetQueueStatus(jobType.Name)
 		if err != nil {
 			return nil, err
 		}

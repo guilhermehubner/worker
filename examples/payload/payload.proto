@@ -2,7 +2,22 @@ syntax = "proto3";
 
 package payload;
 
-message Payload {
-  string text   = 1;
-  int64  number = 2;
+message Email {
+  string from    = 1;
+  string to      = 2;
+  string subject = 3;
+  string body    = 4;
+}
+
+message Expression {
+  int64 operand1      = 1;
+  int64 operand2      = 2;
+  Operation operation = 3;
+
+  enum Operation {
+    ADD = 0;
+    SUB = 1;
+    MUL = 2;
+    DIV = 3;
+  }
 }

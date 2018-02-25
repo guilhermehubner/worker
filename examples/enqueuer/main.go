@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/guilhermehubner/worker"
 	"github.com/guilhermehubner/worker/examples/payload"
@@ -11,25 +10,28 @@ import (
 func main() {
 	enqueuer := worker.NewEnqueuer("amqp://guest:guest@localhost:5672/")
 
-	for {
-		time.Sleep(500 * time.Millisecond)
-
-		err := enqueuer.Enqueue("queue1", &payload.Payload{
-			Text:   "Hello queue 1",
-			Number: time.Now().Unix(),
+	for i := 1; i <= 10; i++ {
+		err := enqueuer.Enqueue("mailing", &payload.Email{
+			From:    "John",
+			To:      "Mary",
+			Subject: fmt.Sprintf("Photos from last night %d/10", i),
+			Body:    "Attachment",
 		})
 		if err != nil {
-			fmt.Printf("Failed to enqueue 1: %s", err)
+			fmt.Printf("Failed enqueueing a mailing job: %s", err)
 			return
 		}
+		fmt.Printf("Sent mailing job %d\n", i)
 
-		err = enqueuer.Enqueue("queue2", &payload.Payload{
-			Text:   "Hello queue 2",
-			Number: time.Now().Unix(),
+		err = enqueuer.Enqueue("calculator", &payload.Expression{
+			Operand1:  10,
+			Operand2:  int64(i),
+			Operation: payload.Expression_ADD,
 		})
 		if err != nil {
-			fmt.Printf("Failed to enqueue 2: %s", err)
+			fmt.Printf("Failed enqueueing calculation job: %s", err)
 			return
 		}
+		fmt.Printf("Sent calculation job %d\n", i)
 	}
 }

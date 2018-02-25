@@ -27,12 +27,12 @@ func NewEnqueuer(url string) *Enqueuer {
 }
 
 // Enqueue will enqueue the specified message for job queue.
-func (e *Enqueuer) Enqueue(jobName string, message proto.Message) error {
-	return e.broker.Enqueue(jobName, makeIdentifier(), message)
+func (e *Enqueuer) Enqueue(queueName string, message proto.Message) error {
+	return e.broker.Enqueue(queueName, makeIdentifier(), message)
 }
 
 // EnqueueIn enqueues a message in the scheduled job queue for execution secondsFromNow seconds.
-func (e *Enqueuer) EnqueueIn(jobName string, message proto.Message,
+func (e *Enqueuer) EnqueueIn(name string, message proto.Message,
 	secondsFromNow int64) (string, error) {
-	return e.broker.EnqueueIn(jobName, makeIdentifier(), message, secondsFromNow)
+	return e.broker.EnqueueIn(name, makeIdentifier(), message, secondsFromNow)
 }
