@@ -17,4 +17,6 @@ lint:
 	gosimple ${PACKAGES} | awk '{print ""; print} END {if (NR > 0) {exit 1} else print "... ok"}' && \
 	echo -n ">> unused" && \
 	unused ${PACKAGES} | awk '{print ""; print} END {if (NR > 0) {exit 1} else print "... ok"}'
+test:
+	go test ${PACKAGES}
 
