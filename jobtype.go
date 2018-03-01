@@ -2,6 +2,7 @@ package worker
 
 import (
 	"github.com/golang/protobuf/proto"
+	"github.com/guilhermehubner/worker/broker"
 	"golang.org/x/net/context"
 )
 
@@ -40,9 +41,9 @@ func (slice jobTypes) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func injectJobInfo(ctx context.Context, job JobType, messageID string) context.Context {
+func injectJobInfo(ctx context.Context, job JobType, message *broker.Message) context.Context {
 	ctx = context.WithValue(ctx, jobInfoKey{}, JobInfo{
-		MessageID: messageID,
+		MessageID: message.ID(),
 		Name:      job.Name,
 		Priority:  job.Priority,
 		Retry:     job.Retry,

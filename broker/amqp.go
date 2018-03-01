@@ -32,6 +32,47 @@ type Status struct {
 	Error    error `json:",omitempty"`
 }
 
+type Message struct {
+	message amqp.Delivery
+	broker  *AMQPBroker
+}
+
+func (m *Message) Body() []byte {
+	return m.message.Body
+}
+
+func (m *Message) ID() string {
+	return m.message.MessageId
+}
+
+func (m *Message) Retries() uint8 {
+	retry, _ := m.message.Headers["Retry"].(uint8)
+	return retry
+}
+
+func (m *Message) Requeue() error {
+	ch, err := m.broker.connection.Channel()
+	if err != nil {
+		return err
+	}
+
+	return ch.Publish(
+		"",
+		m.message.RoutingKey,
+		false,
+		false,
+		amqp.Publishing{
+			MessageId:    m.message.MessageId,
+			Timestamp:    time.Now(),
+			Body:         m.message.Body,
+			DeliveryMode: 2,
+			Headers: amqp.Table{
+				"Retry": m.Retries() + 1,
+			},
+		},
+	)
+}
+
 func (b *AMQPBroker) RegisterJob(jobName string) error {
 	_, err := b.channel.QueueDeclare(
 		jobName, // name
@@ -55,17 +96,20 @@ func (b *AMQPBroker) GetQueueStatus(name string) (Status, error) {
 	}, nil
 }
 
-func (b *AMQPBroker) GetMessage(jobName string) ([]byte, string) {
+func (b *AMQPBroker) GetMessage(jobName string) *Message {
 	msg, ok, err := b.channel.Get(jobName, true)
 	if err != nil {
 		log.Get().Error(fmt.Sprintf("broker/amqp: fail to get message: %v", err))
-		return nil, ""
+		return nil
 	}
 	if !ok {
-		return nil, ""
+		return nil
 	}
 
-	return msg.Body, msg.MessageId
+	return &Message{
+		message: msg,
+		broker:  b,
+	}
 }
 
 func (b *AMQPBroker) Enqueue(name, messageID string, message proto.Message) error {

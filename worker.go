@@ -6,6 +6,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/guilhermehubner/worker/broker"
 	"github.com/jpillora/backoff"
 )
 
@@ -14,7 +15,7 @@ const (
 	maxBackoffTime = 10 * time.Second
 )
 
-type getJobHandle func() ([]byte, string, *JobType)
+type getJobHandle func() (*broker.Message, *JobType)
 
 type worker struct {
 	middlewares []Middleware
@@ -54,18 +55,13 @@ func (w *worker) start() chan struct{} {
 }
 
 func (w *worker) executeJob() {
-	rawMessage, messageID, job := w.getJob()
-	if rawMessage == nil || job == nil {
+	message, job := w.getJob()
+	if message == nil {
 		return
 	}
 
-	gen := func(message proto.Message) error {
-		return proto.Unmarshal(rawMessage, message)
-	}
-
-	retries := 1
-	if job.Retry > 0 {
-		retries = int(job.Retry)
+	gen := func(msg proto.Message) error {
+		return proto.Unmarshal(message.Body(), msg)
 	}
 
 	wrappedHandle := func(ctx context.Context) error {
@@ -77,21 +73,21 @@ func (w *worker) executeJob() {
 		oldWrapped := wrappedHandle
 
 		wrappedHandle = func(ctx context.Context) error {
-			return w.middlewares[index](injectJobInfo(ctx, *job, messageID),
+			return w.middlewares[index](injectJobInfo(ctx, *job, message),
 				oldWrapped)
 		}
 	}
 
-	for i := retries; i > 0; i-- {
-		ctx, cancelFn := context.WithCancel(context.Background())
+	ctx, cancelFn := context.WithCancel(context.Background())
+	defer cancelFn()
 
-		err := wrappedHandle(ctx)
-		if err == nil {
+	if err := wrappedHandle(ctx); err != nil {
+		if job != nil && message.Retries() < job.Retry {
+			for err := message.Requeue(); err != nil; {
+				time.Sleep(w.backoff.Duration())
+			}
+
 			w.backoff.Reset()
-			break
 		}
-
-		cancelFn()
-		time.Sleep(w.backoff.Duration())
 	}
 }
