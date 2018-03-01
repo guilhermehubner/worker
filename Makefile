@@ -1,5 +1,5 @@
 PACKAGES=`go list ./... | grep -v vendor`
-FILES=$(shell find . -name "*.go" | grep -v vendor)
+FILES=$(shell find . -name "*.go" | grep -v vendor | grep -v .pb.go)
 
 # TODO: Remove 'should have comment'
 lint:
