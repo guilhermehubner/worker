@@ -96,20 +96,19 @@ func (b *AMQPBroker) GetQueueStatus(name string) (Status, error) {
 	}, nil
 }
 
-func (b *AMQPBroker) GetMessage(jobName string) *Message {
+func (b *AMQPBroker) GetMessage(jobName string) (*Message, error) {
 	msg, ok, err := b.channel.Get(jobName, true)
 	if err != nil {
-		log.Get().Error(fmt.Sprintf("broker/amqp: fail to get message: %v", err))
-		return nil
+		return nil, err
 	}
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
 	return &Message{
 		message: msg,
 		broker:  b,
-	}
+	}, nil
 }
 
 func (b *AMQPBroker) Enqueue(name, messageID string, message proto.Message) error {
@@ -234,19 +233,25 @@ func (b *AMQPBroker) connect() {
 		b.closed = b.connection.NotifyClose(make(chan *amqp.Error))
 		b.backoff.Reset()
 		b.connected = true
-		log.Get().Info("\x1b[1;32mCONNECTED\x1b[0m")
 		break
 	}
+
+	log.Get().Info("\x1b[1;32mCONNECTED\x1b[0m")
 }
 
 func (b *AMQPBroker) reconnect() {
-	for e := range b.closed {
+	e, ok := <-b.closed
+	if e != nil || !ok {
 		log.Get().Info("\x1b[1;31mCONNECTION CLOSED\x1b[0m")
-		log.Get().Error(e)
+		if e != nil {
+			log.Get().Error(e)
+		}
 
 		b.connected = false
 		b.connect()
 	}
+
+	go b.reconnect()
 }
 
 func NewBroker(url string) *AMQPBroker {

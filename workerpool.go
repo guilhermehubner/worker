@@ -57,21 +57,24 @@ func (wp *Pool) Start() {
 
 	sort.Sort(wp.jobTypes)
 
-	getJob := func() (*broker.Message, *JobType) {
+	getJob := func() (*broker.Message, *JobType, error) {
 		for _, jobType := range wp.jobTypes {
 			if wp.stop {
-				return nil, nil
+				return nil, nil, nil
 			}
 
-			msg := wp.broker.GetMessage(jobType.Name)
+			msg, err := wp.broker.GetMessage(jobType.Name)
+			if err != nil {
+				return nil, nil, err
+			}
 			if msg == nil {
 				continue
 			}
 
-			return msg, &jobType
+			return msg, &jobType, nil
 		}
 
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	workersEnded := make([]chan struct{}, 0, len(wp.workers))

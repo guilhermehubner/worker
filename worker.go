@@ -1,12 +1,14 @@
 package worker
 
 import (
+	"fmt"
 	"time"
 
 	"golang.org/x/net/context"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/guilhermehubner/worker/broker"
+	"github.com/guilhermehubner/worker/log"
 	"github.com/jpillora/backoff"
 )
 
@@ -15,14 +17,15 @@ const (
 	maxBackoffTime = 10 * time.Second
 )
 
-type getJobHandle func() (*broker.Message, *JobType)
+type getJobHandle func() (*broker.Message, *JobType, error)
 
 type worker struct {
-	middlewares []Middleware
-	getJob      getJobHandle
-	cancel      chan struct{}
-	ended       chan struct{}
-	backoff     *backoff.Backoff
+	middlewares       []Middleware
+	getJob            getJobHandle
+	cancel            chan struct{}
+	ended             chan struct{}
+	backoff           *backoff.Backoff
+	getMessageBackoff *backoff.Backoff
 }
 
 func newWorker(middlewares []Middleware, getJob getJobHandle) *worker {
@@ -32,6 +35,10 @@ func newWorker(middlewares []Middleware, getJob getJobHandle) *worker {
 		cancel:      make(chan struct{}),
 		ended:       make(chan struct{}),
 		backoff: &backoff.Backoff{
+			Min: minBackoffTime,
+			Max: maxBackoffTime,
+		},
+		getMessageBackoff: &backoff.Backoff{
 			Min: minBackoffTime,
 			Max: maxBackoffTime,
 		},
@@ -55,7 +62,15 @@ func (w *worker) start() chan struct{} {
 }
 
 func (w *worker) executeJob() {
-	message, job := w.getJob()
+	message, job, err := w.getJob()
+	if err != nil {
+		log.Get().Error(fmt.Sprintf("worker: fail to get job: %v", err))
+		time.Sleep(w.getMessageBackoff.Duration())
+		return
+	}
+
+	w.getMessageBackoff.Reset()
+
 	if message == nil {
 		return
 	}
