@@ -87,10 +87,12 @@ func (w *worker) executeJob() {
 		index := i
 		oldWrapped := wrappedHandle
 
-		wrappedHandle = func(ctx context.Context) error {
-			return w.middlewares[index](injectJobInfo(ctx, *job, message),
-				oldWrapped)
-		}
+		wrappedHandle = func(index int) func(context.Context) error {
+			return func(ctx context.Context) error {
+				return w.middlewares[index](injectJobInfo(ctx, *job, message),
+					oldWrapped)
+			}
+		}(index)
 	}
 
 	ctx, cancelFn := context.WithCancel(context.Background())

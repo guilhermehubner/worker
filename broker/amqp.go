@@ -215,7 +215,11 @@ func (b *AMQPBroker) connect() {
 	log.Get().Info("CONNECTING...")
 
 	for {
-		connection, err := amqp.Dial(b.url)
+		connection, err := amqp.DialConfig(b.url, amqp.Config{
+			Heartbeat: 60 * time.Second,
+			Locale:    "en_US",
+		})
+
 		if err != nil {
 			log.Get().Error(fmt.Sprintf("broker/amqp: fail to connect: %v", err))
 			time.Sleep(b.backoff.Duration())
